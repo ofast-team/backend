@@ -4,7 +4,9 @@ import {
   DEFAULT_MEMORY_LIMIT,
   DEFAULT_TIME_LIMIT,
   MAX_CASES,
+  MAX_MEMORY_LIMIT,
   MAX_TIME_LIMIT,
+  MIN_MEMORY_LIMIT,
   db,
   judge_url,
 } from './util'
@@ -230,6 +232,8 @@ export async function submit(req: Request, res: Response) {
         }
 
         time_limit = Math.min(MAX_TIME_LIMIT, time_limit)
+        memory_limit = Math.min(MAX_MEMORY_LIMIT, memory_limit)
+        memory_limit = Math.max(MIN_MEMORY_LIMIT, memory_limit)
 
         for (let i = 0; i < inputs.length; i++) {
           submissions.push({
