@@ -93,7 +93,7 @@ export async function get_limits(problem_id: string): Promise<{
     .then((problem) => {
       if (problem.exists()) {
         time_limit = problem.data().timeLimit
-        memory_limit = problem.data().memory_limit
+        memory_limit = problem.data().memoryLimit
       }
       return { time_limit: time_limit, memory_limit: memory_limit }
     })
