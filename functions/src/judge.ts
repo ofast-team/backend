@@ -244,7 +244,7 @@ export async function submit(req: Request, res: Response) {
             compiler_options: compiler_flags,
             command_line_arguments: args,
             cpu_time_limit: time_limit,
-            memory_limit: memory_limit * 1000,
+            memory_limit: memory_limit * 1024,
           })
         }
 
