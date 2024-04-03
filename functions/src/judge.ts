@@ -7,6 +7,7 @@ import {
   getDocs,
   query,
   collection,
+  increment,
 } from 'firebase/firestore'
 import {
   DEFAULT_TIME_LIMIT,
@@ -327,9 +328,46 @@ export async function get_verdict(req: Request, res: Response) {
           new_object.pending = pending
           new_object.memory = memory
 
-          updateDoc(doc(db, 'Submissions', submission_id), new_object)
+          let verdictUpdate = {}
+          if (!pending) {
+            switch (verdict) {
+              case 3: {
+                verdictUpdate = { submissionsAccepted: increment(1) }
+                break
+              }
+              case 4: {
+                verdictUpdate = { submissionsWrong: increment(1) }
+                break
+              }
+              case 5: {
+                verdictUpdate = { submissionsTLE: increment(1) }
+                break
+              }
+              case 6: {
+                verdictUpdate = { submissionsCTE: increment(1) }
+                break
+              }
+              default: {
+                verdictUpdate = { submissionsRTE: increment(1) }
+                break
+              }
+            }
+            verdictUpdate = {
+              ...verdictUpdate,
+              numSubmissions: increment(1),
+            }
+          }
+
+          const userId = new_object.uid
+          updateDoc(doc(db, 'UserData', userId), verdictUpdate)
             .then(() => {
-              return res.status(200).json(new_object)
+              updateDoc(doc(db, 'Submissions', submission_id), new_object)
+                .then(() => {
+                  return res.status(200).json(new_object)
+                })
+                .catch((err) => {
+                  return res.status(500).json({ error: err })
+                })
             })
             .catch((err) => {
               return res.status(500).json({ error: err })
