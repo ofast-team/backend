@@ -7,11 +7,10 @@ export async function updateProblemData(req: Request, res: Response) {
   try {
     const problemData: ProblemData[] = req.body
     await Promise.all(
-      problemData.map(
-        (data) =>
-          setDoc(doc(db, 'ProblemData', data.problemID), data, {
-            merge: true,
-          }) /* verify the merge udpates the data correctly */,
+      problemData.map((data) =>
+        setDoc(doc(db, 'ProblemData', data.problemID), data, {
+          merge: true,
+        }),
       ),
     )
   } catch (err) {

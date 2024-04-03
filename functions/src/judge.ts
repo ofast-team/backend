@@ -7,7 +7,13 @@ import {
   collection,
   increment,
 } from 'firebase/firestore'
-import { MAX_CASES, db, judge_url } from './util'
+import {
+  DEFAULT_TIME_LIMIT,
+  MAX_CASES,
+  MAX_TIME_LIMIT,
+  db,
+  judge_url,
+} from './util'
 import { Buffer } from 'buffer'
 import axios from 'axios'
 
@@ -50,23 +56,50 @@ async function get_data(problem_id: string): Promise<{
   const inputs: string[] = []
   const outputs: string[] = []
   // get the data from the database
-  await getDoc(doc(db, 'Problems', problem_id))
+  await getDoc(doc(db, 'ProblemData', problem_id))
     .then((problem) => {
       if (problem.exists()) {
-        const data = problem.data().sampleData
+        const data = problem.data().data
         for (let i = 0; i < data.length; i++) {
           inputs.push(Buffer.from(data[i].input).toString('base64'))
           outputs.push(Buffer.from(data[i].output).toString('base64'))
         }
-        return { inputs: inputs, outputs: outputs, error: undefined }
+        return {
+          inputs: inputs,
+          outputs: outputs,
+          error: undefined,
+        }
       } else {
         return { error: 'Problem does not exist' }
       }
     })
     .catch((err) => {
-      return { error: err, inputs: undefined, outputs: undefined }
+      return {
+        error: err,
+        inputs: undefined,
+        outputs: undefined,
+      }
     })
-  return { inputs: inputs, outputs: outputs, error: undefined }
+  return {
+    inputs: inputs,
+    outputs: outputs,
+    error: undefined,
+  }
+}
+
+export async function get_time_limit(problem_id: string) {
+  let time_limit = DEFAULT_TIME_LIMIT
+  await getDoc(doc(db, 'Problems', problem_id))
+    .then((problem) => {
+      if (problem.exists()) {
+        time_limit = problem.data().timeLimit
+      }
+      return time_limit
+    })
+    .catch(() => {
+      return DEFAULT_TIME_LIMIT
+    })
+  return time_limit
 }
 
 export async function submit(req: Request, res: Response) {
@@ -78,6 +111,7 @@ export async function submit(req: Request, res: Response) {
   const language_string = req.body.language_id
   const uid = req.body.uid
   let problem_id = req.body.problem_id
+  let time_limit = req.body.time_limit
 
   let error = ''
 
@@ -104,6 +138,7 @@ export async function submit(req: Request, res: Response) {
     if (outputs == undefined) {
       missing.push('Missing outputs array')
     }
+
     if (missing.length > 0) {
       return res.status(400).json({ error: missing })
     }
@@ -115,10 +150,15 @@ export async function submit(req: Request, res: Response) {
     inputs = data.inputs
     outputs = data.outputs
     error = data.error
+    time_limit = await get_time_limit(problem_id)
   }
 
   if (error != '' && error != undefined) {
     return res.status(500).json({ error: 'Something went wrong...' })
+  }
+
+  if (time_limit == undefined) {
+    time_limit = DEFAULT_TIME_LIMIT
   }
 
   await getDoc(doc(db, 'UserData', uid))
@@ -157,6 +197,7 @@ export async function submit(req: Request, res: Response) {
           expected_output: string
           language_id: number
           compiler_options: string
+          cpu_time_limit: number
           command_line_arguments: string
         }[] = []
 
@@ -178,6 +219,8 @@ export async function submit(req: Request, res: Response) {
             .json({ error: 'Too many cases (max of ' + MAX_CASES + ')' })
         }
 
+        time_limit = Math.min(MAX_TIME_LIMIT, time_limit)
+
         for (let i = 0; i < inputs.length; i++) {
           submissions.push({
             source_code: code,
@@ -186,6 +229,7 @@ export async function submit(req: Request, res: Response) {
             language_id: language,
             compiler_options: compiler_flags,
             command_line_arguments: args,
+            cpu_time_limit: time_limit,
           })
         }
 
