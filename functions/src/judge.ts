@@ -18,6 +18,7 @@ import {
 } from './util'
 import axios from 'axios'
 import { decompress } from 'lzutf8'
+import { Buffer } from 'buffer'
 
 export async function judge_is_online(_req: Request, res: Response) {
   try {
@@ -63,18 +64,16 @@ async function get_data(problem_id: string): Promise<{
 
   dataDocs.forEach((doc) => {
     const data = doc.data()
-    inputs.push(
-      decompress(data.input, {
-        inputEncoding: 'Base64',
-        outputEncoding: 'String',
-      }),
-    )
-    outputs.push(
-      decompress(data.output, {
-        inputEncoding: 'Base64',
-        outputEncoding: 'String',
-      }),
-    )
+    const input = decompress(data.input, {
+      inputEncoding: 'Base64',
+      outputEncoding: 'String',
+    })
+    const output = decompress(data.output, {
+      inputEncoding: 'Base64',
+      outputEncoding: 'String',
+    })
+    inputs.push(Buffer.from(input).toString('base64'))
+    outputs.push(Buffer.from(output).toString('base64'))
   })
 
   return Promise.resolve({ error: undefined, inputs, outputs })
@@ -233,6 +232,7 @@ export async function submit(req: Request, res: Response) {
             return res.status(judge_res.status).json(judge_res.data)
           } else {
             const responses = judge_res.data
+            console.log('res', judge_res)
             for (let i = 0; i < responses.length; i++) {
               if (responses[i].token != undefined) {
                 tokens.push(responses[i].token)
