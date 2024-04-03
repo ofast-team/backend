@@ -336,29 +336,29 @@ export async function get_verdict(req: Request, res: Response) {
           if (!pending) {
             switch (verdict) {
               case 3: {
-                verdictUpdate = { problemsAccepted: increment(1) }
+                verdictUpdate = { submissionsAccepted: increment(1) }
                 break
               }
               case 4: {
-                verdictUpdate = { problemsWrong: increment(1) }
+                verdictUpdate = { submissionsWrong: increment(1) }
                 break
               }
               case 5: {
-                verdictUpdate = { problemsTLE: increment(1) }
+                verdictUpdate = { submissionsTLE: increment(1) }
                 break
               }
               case 6: {
-                verdictUpdate = { problemsCTE: increment(1) }
+                verdictUpdate = { submissionsCTE: increment(1) }
                 break
               }
               default: {
-                verdictUpdate = { problemsRTE: increment(1) }
+                verdictUpdate = { submissionsRTE: increment(1) }
                 break
               }
             }
             verdictUpdate = {
               ...verdictUpdate,
-              problemsAttempted: increment(1),
+              numSubmissions: increment(1),
             }
           }
 
