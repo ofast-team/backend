@@ -77,9 +77,6 @@ async function get_data(problem_id: string): Promise<{
     )
   })
 
-  console.log('here')
-  console.log(inputs[0], outputs[0])
-
   return Promise.resolve({ error: undefined, inputs, outputs })
 }
 
