@@ -1,5 +1,12 @@
 import { Request, Response } from 'express'
-import { doc, updateDoc, addDoc, getDoc, collection } from 'firebase/firestore'
+import {
+  doc,
+  updateDoc,
+  addDoc,
+  getDoc,
+  collection,
+  increment,
+} from 'firebase/firestore'
 import { MAX_CASES, db, judge_url } from './util'
 import { Buffer } from 'buffer'
 import axios from 'axios'
@@ -281,9 +288,46 @@ export async function get_verdict(req: Request, res: Response) {
           new_object.pending = pending
           new_object.memory = memory
 
-          updateDoc(doc(db, 'Submissions', submission_id), new_object)
+          let verdictUpdate = {}
+          if (!pending) {
+            switch (verdict) {
+              case 3: {
+                verdictUpdate = { problemsAccepted: increment(1) }
+                break
+              }
+              case 4: {
+                verdictUpdate = { problemsWrong: increment(1) }
+                break
+              }
+              case 5: {
+                verdictUpdate = { problemsTLE: increment(1) }
+                break
+              }
+              case 6: {
+                verdictUpdate = { problemsCTE: increment(1) }
+                break
+              }
+              default: {
+                verdictUpdate = { problemsRTE: increment(1) }
+                break
+              }
+            }
+            verdictUpdate = {
+              ...verdictUpdate,
+              problemsAttempted: increment(1),
+            }
+          }
+
+          const userId = new_object.uid
+          updateDoc(doc(db, 'UserData', userId), verdictUpdate)
             .then(() => {
-              return res.status(200).json(new_object)
+              updateDoc(doc(db, 'Submissions', submission_id), new_object)
+                .then(() => {
+                  return res.status(200).json(new_object)
+                })
+                .catch((err) => {
+                  return res.status(500).json({ error: err })
+                })
             })
             .catch((err) => {
               return res.status(500).json({ error: err })
