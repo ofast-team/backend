@@ -4,6 +4,8 @@ import {
   updateDoc,
   addDoc,
   getDoc,
+  getDocs,
+  query,
   collection,
   increment,
 } from 'firebase/firestore'
@@ -14,8 +16,9 @@ import {
   db,
   judge_url,
 } from './util'
-import { Buffer } from 'buffer'
 import axios from 'axios'
+import { decompress } from 'lzutf8'
+import { Buffer } from 'buffer'
 
 export async function judge_is_online(_req: Request, res: Response) {
   try {
@@ -55,36 +58,25 @@ async function get_data(problem_id: string): Promise<{
 }> {
   const inputs: string[] = []
   const outputs: string[] = []
-  // get the data from the database
-  await getDoc(doc(db, 'ProblemData', problem_id))
-    .then((problem) => {
-      if (problem.exists()) {
-        const data = problem.data().data
-        for (let i = 0; i < data.length; i++) {
-          inputs.push(Buffer.from(data[i].input).toString('base64'))
-          outputs.push(Buffer.from(data[i].output).toString('base64'))
-        }
-        return {
-          inputs: inputs,
-          outputs: outputs,
-          error: undefined,
-        }
-      } else {
-        return { error: 'Problem does not exist' }
-      }
+  const problemDataCollection = collection(db, `Problems/${problem_id}/data`)
+
+  const dataDocs = await getDocs(query(problemDataCollection))
+
+  dataDocs.forEach((doc) => {
+    const data = doc.data()
+    const input = decompress(data.input, {
+      inputEncoding: 'Base64',
+      outputEncoding: 'String',
     })
-    .catch((err) => {
-      return {
-        error: err,
-        inputs: undefined,
-        outputs: undefined,
-      }
+    const output = decompress(data.output, {
+      inputEncoding: 'Base64',
+      outputEncoding: 'String',
     })
-  return {
-    inputs: inputs,
-    outputs: outputs,
-    error: undefined,
-  }
+    inputs.push(Buffer.from(input).toString('base64'))
+    outputs.push(Buffer.from(output).toString('base64'))
+  })
+
+  return Promise.resolve({ error: undefined, inputs, outputs })
 }
 
 export async function get_time_limit(problem_id: string) {
