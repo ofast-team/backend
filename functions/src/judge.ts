@@ -232,7 +232,6 @@ export async function submit(req: Request, res: Response) {
             return res.status(judge_res.status).json(judge_res.data)
           } else {
             const responses = judge_res.data
-            console.log('res', judge_res)
             for (let i = 0; i < responses.length; i++) {
               if (responses[i].token != undefined) {
                 tokens.push(responses[i].token)
