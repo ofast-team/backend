@@ -52,6 +52,8 @@ import {
   isVerified,
   sendVerificationEmail,
   doSendPasswordResetEmail,
+  checkResetPassword,
+  doResetPassword,
 } from './user'
 import { getUserData, updateUserData } from './userData'
 import { getProblems } from './getProblems'
@@ -224,6 +226,7 @@ app.post('/sendVerificationEmail', sendVerificationEmail)
  *      the user was sent a password reset email or not
  */
 app.post('/sendPasswordResetEmail', doSendPasswordResetEmail)
+
 /*
  * API for getting the submissions for each problem in a given list of problems
  * @req JSON with the user id, the list of problemIds needed, and isBrief which
@@ -241,5 +244,19 @@ app.post('/sendPasswordResetEmail', doSendPasswordResetEmail)
  *            contained in this object
  */
 app.post('/getSubmissions', getSubmissions)
+
+/*
+ * API for checking if the reset password oob code is invalid or expired
+ * @req JSON with the oob code for reset password
+ * @res A JSON file with a general message stating if the code is valid
+ */
+app.post('/checkResetPassword', checkResetPassword)
+
+/*
+ * API for performing the reset password
+ * @req JSON with the oob code for reset password and the new password
+ * @res A JSON file with a general message stating if the password was successfully reset
+ */
+app.post('/doResetPassword', doResetPassword)
 
 exports.api = https.onRequest(app)
