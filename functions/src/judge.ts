@@ -10,9 +10,12 @@ import {
   increment,
 } from 'firebase/firestore'
 import {
+  DEFAULT_MEMORY_LIMIT,
   DEFAULT_TIME_LIMIT,
   MAX_CASES,
+  MAX_MEMORY_LIMIT,
   MAX_TIME_LIMIT,
+  MIN_MEMORY_LIMIT,
   db,
   judge_url,
 } from './util'
@@ -79,19 +82,27 @@ async function get_data(problem_id: string): Promise<{
   return Promise.resolve({ error: undefined, inputs, outputs })
 }
 
-export async function get_time_limit(problem_id: string) {
+export async function get_limits(problem_id: string): Promise<{
+  time_limit: number
+  memory_limit: number
+}> {
   let time_limit = DEFAULT_TIME_LIMIT
+  let memory_limit = DEFAULT_MEMORY_LIMIT
   await getDoc(doc(db, 'Problems', problem_id))
     .then((problem) => {
       if (problem.exists()) {
         time_limit = problem.data().timeLimit
+        memory_limit = problem.data().memoryLimit
       }
-      return time_limit
+      return { time_limit: time_limit, memory_limit: memory_limit }
     })
     .catch(() => {
-      return DEFAULT_TIME_LIMIT
+      return {
+        time_limit: DEFAULT_TIME_LIMIT,
+        memory_limit: DEFAULT_MEMORY_LIMIT,
+      }
     })
-  return time_limit
+  return { time_limit: time_limit, memory_limit: memory_limit }
 }
 
 export async function submit(req: Request, res: Response) {
@@ -104,6 +115,7 @@ export async function submit(req: Request, res: Response) {
   const uid = req.body.uid
   let problem_id = req.body.problem_id
   let time_limit = req.body.time_limit
+  let memory_limit = req.body.memory_limit
 
   let error = ''
 
@@ -142,7 +154,9 @@ export async function submit(req: Request, res: Response) {
     inputs = data.inputs
     outputs = data.outputs
     error = data.error
-    time_limit = await get_time_limit(problem_id)
+    const limits = await get_limits(problem_id)
+    time_limit = limits.time_limit
+    memory_limit = limits.memory_limit
   }
 
   if (error != '' && error != undefined) {
@@ -151,6 +165,10 @@ export async function submit(req: Request, res: Response) {
 
   if (time_limit == undefined) {
     time_limit = DEFAULT_TIME_LIMIT
+  }
+
+  if (memory_limit == undefined) {
+    memory_limit = DEFAULT_MEMORY_LIMIT
   }
 
   await getDoc(doc(db, 'UserData', uid))
@@ -191,6 +209,7 @@ export async function submit(req: Request, res: Response) {
           compiler_options: string
           cpu_time_limit: number
           command_line_arguments: string
+          memory_limit: number
         }[] = []
 
         if (inputs.length != outputs.length) {
@@ -212,6 +231,8 @@ export async function submit(req: Request, res: Response) {
         }
 
         time_limit = Math.min(MAX_TIME_LIMIT, time_limit)
+        memory_limit = Math.min(MAX_MEMORY_LIMIT, memory_limit)
+        memory_limit = Math.max(MIN_MEMORY_LIMIT, memory_limit)
 
         for (let i = 0; i < inputs.length; i++) {
           submissions.push({
@@ -222,6 +243,7 @@ export async function submit(req: Request, res: Response) {
             compiler_options: compiler_flags,
             command_line_arguments: args,
             cpu_time_limit: time_limit,
+            memory_limit: memory_limit * 1024,
           })
         }
 
