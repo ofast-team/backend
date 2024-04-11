@@ -4,6 +4,8 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   sendPasswordResetEmail,
+  verifyPasswordResetCode,
+  confirmPasswordReset,
 } from 'firebase/auth'
 import { auth, db } from './util'
 import admin from 'firebase-admin'
@@ -113,5 +115,25 @@ export function emailRegister(req: Request, res: Response): void {
       else if (err.code === 'auth/missing-password')
         return res.status(401).json({ general: 'Missing Password' })
       else return res.status(500).json({ error: err.code })
+    })
+}
+
+export function checkResetPassword(req: Request, res: Response): void {
+  verifyPasswordResetCode(auth, req.body.oobCode)
+    .then(() => {
+      return res.status(200).json({ general: 'Valid Code' })
+    })
+    .catch(() => {
+      return res.status(500).json({ general: 'Expired/Invalid Code' })
+    })
+}
+
+export function doResetPassword(req: Request, res: Response): void {
+  confirmPasswordReset(auth, req.body.oobCode, req.body.password)
+    .then(() => {
+      return res.status(200).json({ general: 'Password has been reset!' })
+    })
+    .catch((err) => {
+      return res.status(500).json({ error: err.code })
     })
 }

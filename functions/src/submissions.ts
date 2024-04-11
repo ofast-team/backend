@@ -75,6 +75,14 @@ export async function getSubmissions(req: Request, res: Response) {
         }
 
         if (!isBrief) {
+          submissionList.sort((a, b) => {
+            const timeA = Object(a)['date']
+            const timeB = Object(b)['date']
+            if (timeA > timeB) return -1
+            else if (timeA == timeB) return 0
+            else return 1
+          })
+
           problem = {
             ...problem,
             submissions: submissionList,
