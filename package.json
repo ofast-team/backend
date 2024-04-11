@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@octokit/auth-oauth-app": "^8.0.2",
+    "@octokit/auth-token": "^5.1.0",
     "@octokit/oauth-methods": "^5.0.0",
     "@octokit/rest": "^20.0.2",
     "axios": "^1.6.7",
@@ -10,6 +11,7 @@
     "firebase-admin": "^11.11.0",
     "firebase-functions": "^4.5.0",
     "firebase-tools": "^13.3.1",
+    "lzutf8": "^0.6.3",
     "prettier": "^3.2.5",
     "typescript-eslint": "^0.0.1-alpha.0"
   },

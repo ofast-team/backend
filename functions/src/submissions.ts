@@ -1,6 +1,14 @@
 import { Request, Response } from 'express'
-import { collection, getDocs, query, where } from 'firebase/firestore'
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+} from 'firebase/firestore'
 import { db } from './util'
+import { get_verdict } from './judge'
 export async function getSubmissions(req: Request, res: Response) {
   const uId: number | string = req.body.uid
   const pIds: string[] = req.body.problemIds
@@ -30,6 +38,24 @@ export async function getSubmissions(req: Request, res: Response) {
         )
 
         const docs = await getDocs(queries)
+
+        docs.forEach(async (curDoc) => {
+          if (curDoc.data().pending) {
+            const req: Request = {} as Request
+            req.body = { token: curDoc.id }
+            const res: Response = {} as Response
+            await get_verdict(req, res)
+          }
+
+          getDoc(doc(db, 'Submissions', curDoc.id))
+            .then((newDoc) => {
+              if (newDoc.exists()) curDoc = newDoc
+            })
+            .catch((err) => {
+              res.status(500).json({ error: err })
+            })
+        })
+
         docs.forEach((doc) => {
           submissionList.push({
             submission_id: doc.id,
@@ -49,6 +75,14 @@ export async function getSubmissions(req: Request, res: Response) {
         }
 
         if (!isBrief) {
+          submissionList.sort((a, b) => {
+            const timeA = Object(a)['date']
+            const timeB = Object(b)['date']
+            if (timeA > timeB) return -1
+            else if (timeA == timeB) return 0
+            else return 1
+          })
+
           problem = {
             ...problem,
             submissions: submissionList,

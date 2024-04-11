@@ -1,8 +1,27 @@
 import { Request, Response } from 'express'
-import { doc, updateDoc, addDoc, getDoc, collection } from 'firebase/firestore'
-import { MAX_CASES, db, judge_url } from './util'
-import { Buffer } from 'buffer'
+import {
+  doc,
+  updateDoc,
+  addDoc,
+  getDoc,
+  getDocs,
+  query,
+  collection,
+  increment,
+} from 'firebase/firestore'
+import {
+  DEFAULT_MEMORY_LIMIT,
+  DEFAULT_TIME_LIMIT,
+  MAX_CASES,
+  MAX_MEMORY_LIMIT,
+  MAX_TIME_LIMIT,
+  MIN_MEMORY_LIMIT,
+  db,
+  judge_url,
+} from './util'
 import axios from 'axios'
+import { decompress } from 'lzutf8'
+import { Buffer } from 'buffer'
 
 export async function judge_is_online(_req: Request, res: Response) {
   try {
@@ -42,24 +61,48 @@ async function get_data(problem_id: string): Promise<{
 }> {
   const inputs: string[] = []
   const outputs: string[] = []
-  // get the data from the database
-  await getDoc(doc(db, 'ProblemData', problem_id))
+  const problemDataCollection = collection(db, `Problems/${problem_id}/data`)
+
+  const dataDocs = await getDocs(query(problemDataCollection))
+
+  dataDocs.forEach((doc) => {
+    const data = doc.data()
+    const input = decompress(data.input, {
+      inputEncoding: 'Base64',
+      outputEncoding: 'String',
+    })
+    const output = decompress(data.output, {
+      inputEncoding: 'Base64',
+      outputEncoding: 'String',
+    })
+    inputs.push(Buffer.from(input).toString('base64'))
+    outputs.push(Buffer.from(output).toString('base64'))
+  })
+
+  return Promise.resolve({ error: undefined, inputs, outputs })
+}
+
+export async function get_limits(problem_id: string): Promise<{
+  time_limit: number
+  memory_limit: number
+}> {
+  let time_limit = DEFAULT_TIME_LIMIT
+  let memory_limit = DEFAULT_MEMORY_LIMIT
+  await getDoc(doc(db, 'Problems', problem_id))
     .then((problem) => {
       if (problem.exists()) {
-        const data = problem.data().data
-        for (let i = 0; i < data.length; i++) {
-          inputs.push(Buffer.from(data[i].input).toString('base64'))
-          outputs.push(Buffer.from(data[i].output).toString('base64'))
-        }
-        return { inputs: inputs, outputs: outputs, error: undefined }
-      } else {
-        return { error: 'Problem does not exist' }
+        time_limit = problem.data().timeLimit
+        memory_limit = problem.data().memoryLimit
+      }
+      return { time_limit: time_limit, memory_limit: memory_limit }
+    })
+    .catch(() => {
+      return {
+        time_limit: DEFAULT_TIME_LIMIT,
+        memory_limit: DEFAULT_MEMORY_LIMIT,
       }
     })
-    .catch((err) => {
-      return { error: err, inputs: undefined, outputs: undefined }
-    })
-  return { inputs: inputs, outputs: outputs, error: undefined }
+  return { time_limit: time_limit, memory_limit: memory_limit }
 }
 
 export async function submit(req: Request, res: Response) {
@@ -71,6 +114,8 @@ export async function submit(req: Request, res: Response) {
   const language_string = req.body.language_id
   const uid = req.body.uid
   let problem_id = req.body.problem_id
+  let time_limit = req.body.time_limit
+  let memory_limit = req.body.memory_limit
 
   let error = ''
 
@@ -97,6 +142,7 @@ export async function submit(req: Request, res: Response) {
     if (outputs == undefined) {
       missing.push('Missing outputs array')
     }
+
     if (missing.length > 0) {
       return res.status(400).json({ error: missing })
     }
@@ -108,10 +154,21 @@ export async function submit(req: Request, res: Response) {
     inputs = data.inputs
     outputs = data.outputs
     error = data.error
+    const limits = await get_limits(problem_id)
+    time_limit = limits.time_limit
+    memory_limit = limits.memory_limit
   }
 
   if (error != '' && error != undefined) {
     return res.status(500).json({ error: 'Something went wrong...' })
+  }
+
+  if (time_limit == undefined) {
+    time_limit = DEFAULT_TIME_LIMIT
+  }
+
+  if (memory_limit == undefined) {
+    memory_limit = DEFAULT_MEMORY_LIMIT
   }
 
   await getDoc(doc(db, 'UserData', uid))
@@ -150,7 +207,9 @@ export async function submit(req: Request, res: Response) {
           expected_output: string
           language_id: number
           compiler_options: string
+          cpu_time_limit: number
           command_line_arguments: string
+          memory_limit: number
         }[] = []
 
         if (inputs.length != outputs.length) {
@@ -171,6 +230,10 @@ export async function submit(req: Request, res: Response) {
             .json({ error: 'Too many cases (max of ' + MAX_CASES + ')' })
         }
 
+        time_limit = Math.min(MAX_TIME_LIMIT, time_limit)
+        memory_limit = Math.min(MAX_MEMORY_LIMIT, memory_limit)
+        memory_limit = Math.max(MIN_MEMORY_LIMIT, memory_limit)
+
         for (let i = 0; i < inputs.length; i++) {
           submissions.push({
             source_code: code,
@@ -179,6 +242,8 @@ export async function submit(req: Request, res: Response) {
             language_id: language,
             compiler_options: compiler_flags,
             command_line_arguments: args,
+            cpu_time_limit: time_limit,
+            memory_limit: memory_limit * 1024,
           })
         }
 
@@ -281,9 +346,46 @@ export async function get_verdict(req: Request, res: Response) {
           new_object.pending = pending
           new_object.memory = memory
 
-          updateDoc(doc(db, 'Submissions', submission_id), new_object)
+          let verdictUpdate = {}
+          if (!pending) {
+            switch (verdict) {
+              case 3: {
+                verdictUpdate = { submissionsAccepted: increment(1) }
+                break
+              }
+              case 4: {
+                verdictUpdate = { submissionsWrong: increment(1) }
+                break
+              }
+              case 5: {
+                verdictUpdate = { submissionsTLE: increment(1) }
+                break
+              }
+              case 6: {
+                verdictUpdate = { submissionsCTE: increment(1) }
+                break
+              }
+              default: {
+                verdictUpdate = { submissionsRTE: increment(1) }
+                break
+              }
+            }
+            verdictUpdate = {
+              ...verdictUpdate,
+              numSubmissions: increment(1),
+            }
+          }
+
+          const userId = new_object.uid
+          updateDoc(doc(db, 'UserData', userId), verdictUpdate)
             .then(() => {
-              return res.status(200).json(new_object)
+              updateDoc(doc(db, 'Submissions', submission_id), new_object)
+                .then(() => {
+                  return res.status(200).json(new_object)
+                })
+                .catch((err) => {
+                  return res.status(500).json({ error: err })
+                })
             })
             .catch((err) => {
               return res.status(500).json({ error: err })

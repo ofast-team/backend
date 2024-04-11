@@ -52,11 +52,11 @@ import {
   isVerified,
   sendVerificationEmail,
   doSendPasswordResetEmail,
+  checkResetPassword,
+  doResetPassword,
 } from './user'
 import { getUserData, updateUserData } from './userData'
-import { updateProblems } from './updateProblems'
 import { getProblems } from './getProblems'
-import { updateProblemData } from './updateProblemData'
 import { getProblemData } from './getProblemData'
 import { get_verdict, judge_is_online, submit } from './judge'
 import { getSubmissions } from './submissions'
@@ -133,15 +133,6 @@ app.post('/getUserData', getUserData)
 app.post('/updateUserData', updateUserData)
 
 /**
- * API for updateing all problems in the database
- *
- * @req List of problems to update
- *
- * @res Status of the request
- */
-app.post('/updateProblems', updateProblems)
-
-/**
  * API for getting all problems in the database
  *
  * @req None
@@ -149,22 +140,6 @@ app.post('/updateProblems', updateProblems)
  * @res List of all problems in the database
  */
 app.get('/getProblems', getProblems)
-
-/**
- * API for setting a list of problem's data in the database
- *
- * @req JSON body of the form
- * {
- *   "problemID": string
- *   "data": {
- *     input: string // the input data file as a string
- *     output: string // the output data file as a string
- *    }[]
- * }
- *
- * @res Status of the request
- */
-app.post('/updateProblemData', updateProblemData)
 
 /**
  * API for getting a problem's data from the database
@@ -251,6 +226,7 @@ app.post('/sendVerificationEmail', sendVerificationEmail)
  *      the user was sent a password reset email or not
  */
 app.post('/sendPasswordResetEmail', doSendPasswordResetEmail)
+
 /*
  * API for getting the submissions for each problem in a given list of problems
  * @req JSON with the user id, the list of problemIds needed, and isBrief which
@@ -277,5 +253,19 @@ import { postProblem } from './postProblem'
  * @res JSON containing the status of the request
  */
 app.post('/postProblem', postProblem)
+
+/*
+ * API for checking if the reset password oob code is invalid or expired
+ * @req JSON with the oob code for reset password
+ * @res A JSON file with a general message stating if the code is valid
+ */
+app.post('/checkResetPassword', checkResetPassword)
+
+/*
+ * API for performing the reset password
+ * @req JSON with the oob code for reset password and the new password
+ * @res A JSON file with a general message stating if the password was successfully reset
+ */
+app.post('/doResetPassword', doResetPassword)
 
 exports.api = https.onRequest(app)

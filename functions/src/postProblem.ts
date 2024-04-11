@@ -1,15 +1,14 @@
 import { Octokit } from '@octokit/rest'
 import { Request, Response } from 'express'
-import { createOAuthAppAuth } from '@octokit/auth-oauth-app'
 import type { Problem } from './Problem'
 import { GITHUB_TOKEN } from './githubToken'
+import { createTokenAuth } from '@octokit/auth-token'
 
 export async function postProblem(req: Request, res: Response) {
-  const clientId = '5c6aac2d2c170f80bd69'
-  const githubToken = GITHUB_TOKEN.value
+  const githubToken = GITHUB_TOKEN.value()
+  const auth = createTokenAuth(githubToken)
   const octokit = new Octokit({
-    authStrategy: createOAuthAppAuth,
-    auth: { clientId, clientSecret: githubToken },
+    auth,
   })
   const owner = 'ofast-team'
   const repo = 'problems'
@@ -17,12 +16,20 @@ export async function postProblem(req: Request, res: Response) {
     const problem: Problem = req.body
     const content = JSON.stringify(problem, null, 2)
 
+    const mainBranch = await octokit.rest.git.getRef({
+      owner,
+      repo,
+      ref: 'heads/main',
+    })
+
+    const mainBranchSha = mainBranch.data.object.sha
+
     const branchName = `problem-${problem.problemID}`
     await octokit.rest.git.createRef({
       owner,
       repo,
-      ref: `refs/heads/${problem}`,
-      sha: 'main',
+      ref: `refs/heads/${branchName}`,
+      sha: mainBranchSha,
     })
 
     await octokit.rest.repos.createOrUpdateFileContents({
@@ -43,10 +50,8 @@ export async function postProblem(req: Request, res: Response) {
       body: `Automated Pull Request for Problem #${problem.problemID}`,
     })
 
-    return res
-      .status(200)
-      .send('Problem created successfully: ' + response.data.html_url)
+    return res.status(200).send({ problemLink: response.data.html_url })
   } catch (error) {
-    return res.status(500).send('Error creating Pull Request: ' + error)
+    return res.status(500).send({ error: error })
   }
 }

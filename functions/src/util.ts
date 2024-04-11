@@ -20,3 +20,8 @@ export const db: Firestore = getFirestore(appInit)
 export const judge_url = 'http://174.138.86.255:2358'
 
 export const MAX_CASES = 100
+export const MAX_TIME_LIMIT = 10
+export const DEFAULT_TIME_LIMIT = 1
+export const MAX_MEMORY_LIMIT = 512
+export const DEFAULT_MEMORY_LIMIT = 256
+export const MIN_MEMORY_LIMIT = 3
