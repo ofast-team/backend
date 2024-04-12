@@ -54,6 +54,7 @@ import {
   doSendPasswordResetEmail,
   checkResetPassword,
   doResetPassword,
+  doVerifyEmail,
 } from './user'
 import { getUserData, updateUserData } from './userData'
 import { getProblems } from './getProblems'
@@ -258,5 +259,12 @@ app.post('/checkResetPassword', checkResetPassword)
  * @res A JSON file with a general message stating if the password was successfully reset
  */
 app.post('/doResetPassword', doResetPassword)
+
+/*
+ * API for performing the email verification
+ * @req JSON with the oob code for email verification
+ * @res A JSON file with a general message stating if the email was verified
+ */
+app.post('/doEmailVerification', doVerifyEmail)
 
 exports.api = https.onRequest(app)

@@ -6,6 +6,7 @@ import {
   sendPasswordResetEmail,
   verifyPasswordResetCode,
   confirmPasswordReset,
+  applyActionCode,
 } from 'firebase/auth'
 import { auth, db } from './util'
 import admin from 'firebase-admin'
@@ -132,6 +133,16 @@ export function doResetPassword(req: Request, res: Response): void {
   confirmPasswordReset(auth, req.body.oobCode, req.body.password)
     .then(() => {
       return res.status(200).json({ general: 'Password has been reset!' })
+    })
+    .catch((err) => {
+      return res.status(500).json({ error: err.code })
+    })
+}
+
+export function doVerifyEmail(req: Request, res: Response): void {
+  applyActionCode(auth, req.body.oobCode)
+    .then(() => {
+      return res.status(200).json({ general: 'Email has been verified!' })
     })
     .catch((err) => {
       return res.status(500).json({ error: err.code })
